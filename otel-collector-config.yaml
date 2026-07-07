@@ -4,6 +4,11 @@ receivers:
       - /data/metrics.json
     start_at: beginning
 
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
 exporters:
   otlp_http/victoriametrics:
     endpoint: http://victoriametrics:8428/opentelemetry

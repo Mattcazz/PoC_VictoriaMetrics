@@ -9,9 +9,11 @@ forwards protobuf to VictoriaMetrics on port `8428`.
 
 ## Files
 
-- `docker-compose.yml` — VictoriaMetrics + OpenTelemetry Collector
+- `docker-compose.yml` — VictoriaMetrics + OpenTelemetry Collector + Grafana
 - `otel-collector-config.yaml` — collector pipeline using `otlp_json_file` receiver
 - `metrics.json` — your OTel Collector fileexporter output
+- `grafana/` — Grafana provisioning (datasource + sample dashboard)
+- `verify.py` — confirms all samples from `metrics.json` are in VictoriaMetrics
 - `README.md` — this file
 
 ## Usage
@@ -24,12 +26,22 @@ forwards protobuf to VictoriaMetrics on port `8428`.
 
    The collector reads `metrics.json` on startup and sends it to VictoriaMetrics.
 
-2. Open the VictoriaMetrics UI and select a time range that covers the
-   timestamps in `metrics.json` (for example, **Last 7 days**):
+2. Open Grafana and explore the pre-loaded dashboard:
+
+   http://localhost:3000
+
+   Login: `admin` / `admin`
+
+    A Prometheus datasource pointing at VictoriaMetrics is already configured
+    (VictoriaMetrics is Prometheus-compatible). Because `metrics.json` contains
+    historical timestamps, set the dashboard time range to **Last 7 days** or a
+    custom range that covers your data.
+
+3. Or use the built-in VictoriaMetrics UI:
 
    http://localhost:8428/vmui
 
-3. Or query directly via HTTP:
+4. Or query directly via HTTP:
 
    ```bash
    curl -s 'http://localhost:8428/prometheus/api/v1/query_range' \
@@ -55,6 +67,30 @@ forwards protobuf to VictoriaMetrics on port `8428`.
 
    Because no persistent storage extension is configured, the receiver re-reads
    the file from the start on every restart.
+
+## Verify no data loss
+
+Run the verification script to compare every sample in `metrics.json` against
+what VictoriaMetrics stored:
+
+```bash
+python3 verify.py
+```
+
+Expected output:
+
+```
+Metrics checked: 223
+Expected samples: 3426
+Actual samples:   3426
+Missing samples:  0
+Extra samples:    0
+Value mismatches: 0
+```
+
+The script allows a ±2 ms timestamp tolerance because nanosecond timestamps are
+rounded differently during ingestion; all values and label sets are matched
+exactly.
 
 ## Cleanup
 
