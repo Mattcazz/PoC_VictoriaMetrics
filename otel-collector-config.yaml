@@ -1,0 +1,23 @@
+receivers:
+  otlp_json_file:
+    include:
+      - /data/metrics.json
+    start_at: beginning
+
+exporters:
+  otlp_http/victoriametrics:
+    endpoint: http://victoriametrics:8428/opentelemetry
+    encoding: proto
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp_json_file]
+      processors: [batch]
+      exporters: [otlp_http/victoriametrics]
+
+  telemetry:
+    logs:
+      level: warn
