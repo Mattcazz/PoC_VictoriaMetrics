@@ -33,12 +33,16 @@ docker compose up -d --build
 
 The `metrics-importer` container waits for VictoriaMetrics to be healthy, streams all messages from `metrics.pb`, then exits. VictoriaMetrics keeps running.
 
-To us VictoriaMetrics: 
+To use VictoriaMetrics: 
 
 ```bash
 # VictoriaMetrics UI
 open http://localhost:8428/vmui
+```
 
+Then in UI you can query metrics with PromQL, e.g.:
+
+ - inesrp_core_rcv_replies_2xx
 
 ## Cleanup
 
