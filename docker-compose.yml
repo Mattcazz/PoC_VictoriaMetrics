@@ -15,33 +15,20 @@ services:
       timeout: 3s
       retries: 10
 
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: otel-collector
+  metrics-importer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metrics-importer
     volumes:
-      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
-      - ./metrics.json:/data/metrics.json:ro
-    command: ["--config", "/etc/otelcol-contrib/config.yaml"]
+      - ./metrics.pb:/data/metrics.pb:ro
+    command:
+      - "-file=/data/metrics.pb"
+      - "-url=http://victoriametrics:8428/opentelemetry/v1/metrics"
     depends_on:
       victoriametrics:
         condition: service_healthy
-
-  grafana:
-    image: grafana/grafana-oss:latest
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
-      - grafana-data:/var/lib/grafana
-    depends_on:
-      - victoriametrics
+    restart: "no"
 
 volumes:
   vmdata:
-  grafana-data:
