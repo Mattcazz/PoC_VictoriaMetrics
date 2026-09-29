@@ -4,11 +4,25 @@ services:
     container_name: victoriametrics
     ports:
       - "8428:8428"
-    volumes:
-      - vmdata:/victoria-metrics-data
     command:
+      # No volume: metrics.json is the source of truth and is re-imported on
+      # every start, so the stored copy is a disposable cache. This also means
+      # `docker compose down` is always a clean reset -- no stale series can
+      # survive into the next run.
       - "--storageDataPath=/victoria-metrics-data"
-      - "--retentionPeriod=30d"
+      # metrics.json holds historical timestamps. VictoriaMetrics silently drops
+      # samples older than the retention period and deletes their monthly
+      # partition, so the default 30d makes an old dump vanish without an error.
+      - "--retentionPeriod=10y"
+      # Store metrics under Prometheus naming (system.cpu.time ->
+      # system_cpu_time_seconds_total). The Grafana dashboard is written against
+      # those names; with the raw OTLP names none of its queries match anything.
+      - "--opentelemetry.usePrometheusNaming"
+      # Restarting the collector re-reads every file from the beginning, and
+      # VictoriaMetrics stores the resulting identical samples twice rather than
+      # overwriting them. Deduplicating per millisecond collapses them back to
+      # one, so re-imports stay idempotent.
+      - "--dedup.minScrapeInterval=1ms"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8428/health"]
       interval: 5s
@@ -20,11 +34,29 @@ services:
     container_name: otel-collector
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
-      - ./metrics.json:/data/metrics.json:ro
+      - ./metrics:/data:ro
     command: ["--config", "/etc/otelcol-contrib/config.yaml"]
     depends_on:
       victoriametrics:
         condition: service_healthy
 
-volumes:
-  vmdata:
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      # Open straight into the dashboard -- no login page. This stack binds to
+      # localhost and holds a static metrics dump, so there is nothing to guard;
+      # do not expose it on a public interface as-is.
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_BASIC_ENABLED=false
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      victoriametrics:
+        condition: service_healthy

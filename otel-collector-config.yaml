@@ -1,10 +1,15 @@
 receivers:
+  # Reads the OTel Collector fileexporter dump: one OTLP/JSON request per line.
+  # No storage extension is configured, so the file is re-read from the start
+  # every time the collector restarts.
   otlp_json_file:
     include:
-      - /data/metrics.json
+      - /data/*.json
     start_at: beginning
 
 exporters:
+  # VictoriaMetrics ingests OTLP protobuf, not OTLP/JSON, so the collector's
+  # only job here is to re-encode the dump and ship it.
   otlp_http/victoriametrics:
     endpoint: http://victoriametrics:8428/opentelemetry
     encoding: proto
@@ -15,7 +20,6 @@ service:
   pipelines:
     metrics:
       receivers: [otlp_json_file]
-      processors: [batch]
       exporters: [otlp_http/victoriametrics]
 
   telemetry:

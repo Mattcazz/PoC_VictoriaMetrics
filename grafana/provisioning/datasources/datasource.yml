@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: VictoriaMetrics
+    # VictoriaMetrics is Prometheus-compatible, so the core Prometheus
+    # datasource works without installing the VictoriaMetrics plugin.
+    type: prometheus
+    access: proxy
+    # The dashboard references this uid, so it must stay fixed.
+    uid: victoriametrics
+    url: http://victoriametrics:8428
+    isDefault: true
+    jsonData:
+      # Grafana derives the rate() window from this:
+      #     $__rate_interval = max($__interval + timeInterval, 4 * timeInterval)
+      # The host metrics in metrics.json are 60s apart. At the obvious value of
+      # 10s the window is 40s -- narrower than that gap -- so rate() returns 0
+      # and the dashboard's `1 - avg(rate(cpu idle))` reads 100% CPU. 15s widens
+      # the window to 1m, which covers the gap.
+      timeInterval: "15s"
+      httpMethod: POST
